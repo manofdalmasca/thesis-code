@@ -351,6 +351,34 @@ public class GraphCode {
         return rohirrim;
     }
     
+    public static String strictDescript(ArrayList<ArrayList<Integer>> repr, 
+            int curNod, int prevNod, int[] origRep) {
+        if (repr.get(curNod).size() == 1) {
+            return "1b";
+        }
+        ArrayList<Integer> locality = repr.get(curNod); 
+        int allaKinder = locality.size();
+        int kinderCount = 0; 
+        int lokiHold;
+        boolean hasNote = false;
+        String[] answers = new String[allaKinder];
+        while (kinderCount < allaKinder) {
+            lokiHold = locality.get(kinderCount);
+            if (lokiHold == prevNod) {
+                answers[kinderCount] = "z";
+                hasNote = true;
+            }
+            else {
+                answers[kinderCount] = strictDescript(repr, lokiHold, curNod, 
+                        origRep);
+            }
+            kinderCount++;
+        }
+        String sortedStr = stringSort(answers, hasNote);
+        //and here lies the main difference between this and makeDescript
+        return Integer.toString(origRep[curNod])+sortedStr+"b";
+    }
+    
     public static String makeDescript(ArrayList<ArrayList<Integer>> repper, 
             int curNode, int prevNode) {
         if (repper.get(curNode).size() == 1) {
@@ -392,19 +420,20 @@ public class GraphCode {
     }
     
     public static boolean areIsomorphic(ArrayList<ArrayList<Integer>> thing1, 
-            ArrayList<ArrayList<Integer>> thing2) {
+            ArrayList<ArrayList<Integer>> thing2, boolean isStrict, 
+            int[] startSeq) {
         //determines if the tree represented by [thing1] 
         //is isomorphic to that represented by [thing2]
         //but: as it turns out, doing in-line isomorphism removal closes 
         //off possibilities. Must design a stricter qualification for that
-        boolean testCase = false;
+        /*boolean testCase = false;
         if (thing1.get(7).size() > 1 && thing1.get(7).get(1) == 5) {
             if (thing1.get(5).size() > 1 && thing1.get(5).get(1) == 4) {
                 if (thing1.get(4).size() > 1 && thing1.get(4).get(1) == 3) {
                     testCase = true; 
                 }
             }
-        }
+        }*/
 
         int[] center1 = findCenter(thing1); 
         int[] center2 = findCenter(thing2);
@@ -412,9 +441,18 @@ public class GraphCode {
             //if one tree has one center but the other has two 
             return false; 
         }
-        String treeRep1 = makeDescript(thing1, center1[0], -1); 
-        String treeRep2 = makeDescript(thing2, center2[0], -1);
+        String treeRep1; 
+        String treeRep2; 
+        if (isStrict) {
+            treeRep1 = strictDescript(thing1, center1[0], -1, startSeq);
+            treeRep2 = strictDescript(thing2, center2[0], -1, startSeq);
+        }
+        else {
+            treeRep1 = makeDescript(thing1, center1[0], -1); 
+            treeRep2 = makeDescript(thing2, center2[0], -1);
+        }
         String treeRep1part2 = "";
+        
         //given the trees as arrayLists, the center nodes, and a default 
         //value of -1, we get a String for each tree which should be unique 
         //to that tree and all its isomorphisms
@@ -433,7 +471,13 @@ public class GraphCode {
         if (center1.length > 1) {
             //if both trees have two centers, its possible that we tested 
             //the wrong ones against each other 
-            treeRep1part2 = makeDescript(thing1, center1[1], -1);
+            if (isStrict) {
+                treeRep1part2 = strictDescript(thing1, center1[1], -1, 
+                        startSeq);
+            }
+            else {
+                treeRep1part2 = makeDescript(thing1, center1[1], -1);
+            }
             //so we'll test the other possible pairing 
             if (treeRep1part2.equals(treeRep2)) {
                 return true; 
@@ -443,7 +487,8 @@ public class GraphCode {
     }
     
     public static ArrayList<ArrayList<ArrayList<Integer>>> isomorphRemove(
-            ArrayList<ArrayList<ArrayList<Integer>>> givens) {
+            ArrayList<ArrayList<ArrayList<Integer>>> givens, 
+            boolean strictVersion, int[] primaSeq) {
         //inputs: an arrayList containing trees, themselves represented as 
         //arraylists
         //Outputs: a similar arraylist containing trees, but with all 
@@ -463,14 +508,16 @@ public class GraphCode {
             while (emptyCount < emptyStart.size() && (!isAnIsomorphism)) {
                 //for every tree we're planning to return as non-isomorphic
                 toCheck = emptyStart.get(emptyCount); 
-                if (areIsomorphic(currentRealization, toCheck)) {
+                if (areIsomorphic(currentRealization, toCheck, strictVersion, 
+                        primaSeq)) {
                     //if the current tree is isomorphic to one we're already
-                    //planning to return: flag it as such
+                    //planning to return, under the conditions requested: 
+                    //flag it as such
                     System.out.println("");
                     System.out.println(currentRealization);
                     System.out.println("is isomorphic to"); 
                     System.out.println(toCheck);
-                    System.out.println("");
+                    System.out.println("under conditions "+strictVersion);
                     isAnIsomorphism = true; 
                 }
                 emptyCount++;
@@ -554,7 +601,9 @@ public class GraphCode {
             }
                 countup++;
         }
-        //sendback = isomorphRemove(sendback);
+        //In-line removal seems to be working with the modified isomorphism
+        //check, and working noticeably faster at that 01/28/17
+        sendback = isomorphRemove(sendback, true, origSeq);
         return sendback;
     }
     
@@ -576,12 +625,14 @@ public class GraphCode {
         ArrayList<Integer> blankList = new ArrayList<Integer>();
         ArrayList<ArrayList<ArrayList<Integer>>> toGive = new ArrayList<ArrayList<ArrayList<Integer>>>();
         toGive = treeTwo(toPass, start, start);
-        toGive = isomorphRemove(toGive); //not sure why this is necessary.
+        System.out.println("Function call over.");
+        //toGive = isomorphRemove(toGive, false, start); //not sure why this is necessary.
         //Could define a helper function to remove it. 
         //The concerning part is that this is seeming to weed out things that 
         //aren't isomorphic after all, or else that not all possibilities
         //are being enumerated in the first place. 1/12/17 
-        System.out.println("Function call over.");
+        //See above note; fixed and no longer necessary 01/28/17
+        //System.out.println("Function call over.");
         Integer countTree = 0; 
         while (countTree < toGive.size()) {
             System.out.println(countTree+": "+toGive.get(countTree));
