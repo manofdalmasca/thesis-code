@@ -7,30 +7,139 @@ package graphcode;
 import java.util.ArrayList;
 import java.lang.Object;
 import java.util.Objects;
+import java.time.Instant;
+import java.time.Duration;
 
 /**
  *
  * @author Samuel
  */
 
+class treeOfTrees {
+//This is a data structure for storing realizations of tree-able degree 
+//sequences, indexed by the sequences themselves. Insertion and retrieval 
+//should be linear-time, relative to the length of the sequence. 
+    public ArrayList<treeOfTrees> offspring; 
+    //the list of children in the tree. Will be null if this node 
+    //contains a sequence and its corresponding realizations. 
+    public int childID;
+    //the integer representing what "number" in the sequence corresponds to 
+    //this node. For leaves, will always be the first node in the corresponding
+    //sequence. 
+    public ArrayList<ArrayList<ArrayList<Integer>>> listing;
+    //for a leaf, the list of realizations corresponding to the degree sequence
+    //represented by the leaf. Null for all others. 
+    public treeOfTrees(int newChildID) {
+        //for creating a branch node, rather than a leaf. 
+        //Will only be called once by an outside context, for the root; 
+        //the other branches will build themselves via bindNewSequence. 
+        offspring = null;
+        //will be filled in later 
+        listing = null;
+        childID = newChildID;
+    }
+    public treeOfTrees(int[] newSeqID, ArrayList<ArrayList<ArrayList<Integer>>> 
+            toStore) {
+        //for creating a leaf node, rather than a branch. Should not need to 
+        //be called at all by an outside context; will be called instead by 
+        //bindNewSequence. 
+        offspring = null;
+        listing = toStore;
+        childID = newSeqID[0];
+    }
+    public void addChild(treeOfTrees toAdd) {
+        //add the specified node as a child to the current node 
+        if (this.offspring == null) {
+            this.offspring = new ArrayList<treeOfTrees>();
+        }
+        this.offspring.add(toAdd);
+    }
+    public void bindNewSequence(int[] newSequence, int curIndex,
+            ArrayList<ArrayList<ArrayList<Integer>>> newStorage) {
+        //For inserting a sequence into its proper position in the tree, 
+        //and its realizations along with it. 
+        //Inputs: the sequence, and a value representing the current index in
+        //the sequence (initially curIndex.length - 1, eventually 0), and of 
+        //course the list of representations to be inserted for [newSequence].
+        if (curIndex == 0) {
+            //if we've reached the correct position in the tree and it's 
+            //time to create the storage leaf 
+            treeOfTrees nuovoChild = new treeOfTrees(newSequence, newStorage);
+            this.addChild(nuovoChild);
+            return;
+        }//otherwise: we need to find the next child branch to recurse on
+        //or, if there is none yet, create such a child branch 
+        int toFindOrCreate = newSequence[curIndex];
+        treeOfTrees novaChild;
+        if (this.offspring == null) {//if no child branches exist yet 
+            novaChild = new treeOfTrees(toFindOrCreate);
+            novaChild.bindNewSequence(newSequence, curIndex - 1, newStorage);
+            this.addChild(novaChild); 
+            return;
+        }
+        int toSearch = this.offspring.size();
+        int searchCount = 0; 
+        boolean doneVal = false;
+        while (searchCount < toSearch && !doneVal) {
+            if (this.offspring.get(searchCount).childID == toFindOrCreate) {
+                //if the desired child branch does exist and we've found it 
+                doneVal = true; 
+                this.offspring.get(searchCount).bindNewSequence(newSequence, 
+                        curIndex - 1, newStorage);
+            }
+            searchCount++;
+        }
+        if (!doneVal) {//if some child branches already exist, but not the 
+            //one we were looking for 
+            novaChild = new treeOfTrees(toFindOrCreate);
+            novaChild.bindNewSequence(newSequence, curIndex - 1, newStorage);
+            this.addChild(novaChild); 
+        }
+    }
+}
+
 public class GraphCode {
+//the main body of our code for generating realizations of tree-able 
+//degree sequences. Written by S. Stern with advice from D. Krizanc. 
     
     public static String arrayPrint(int[] toPrint) {
+        //only returns a string representing the given int array 
+        //doesn't actually print it; that's left to the calling context
         String sendback = "{";
         for(int counter = 0; counter < toPrint.length; counter++) {
             sendback = sendback + Integer.toString(toPrint[counter]); 
-            sendback = sendback + ",";
+            if(counter != toPrint.length - 1) {
+                sendback = sendback + ",";
+            }
+        }
+        return sendback + "}";
+    }
+    
+    public static String dualPrint(int[][] toPrint, int spot, int size) {
+        //only returns a string representing (part of) the given int array 
+        //doesn't actually print it; that's left to the calling context
+        String sendback = "{";
+        for(int counter = 0; counter < size; counter++) {
+            sendback = sendback + Integer.toString(toPrint[counter][spot]); 
+            if(counter != size - 1) {
+                sendback = sendback + ",";
+            }
         }
         return sendback + "}";
     }
     
     public static void swap(int[] incoming, int lowBound, int highBound) {
+        //switches the elements at indexes [lowBound] and [highBound] 
+        //in [incoming]. Constant time. 
         incoming[lowBound] = incoming[lowBound] + incoming[highBound]; 
         incoming[highBound] = incoming[lowBound] - incoming[highBound]; 
         incoming[lowBound] = incoming[lowBound] - incoming[highBound]; 
     }
     
     public static void flipper(int[] givenses, int lowEnd, int endpoint) {
+        //part of a quicksort coded for an earlier project
+        //not actually used in this version of the thesis but left here 
+        //just in case
         if (endpoint - lowEnd >= 2) {
         int origLow = lowEnd; 
         int origHigh = endpoint; 
@@ -48,37 +157,30 @@ public class GraphCode {
             }
         }
         if (givenses[lowEnd] >= givenses[endpoint - 1]) 
-        {//not sure why the [if] is necessary
+        {
             swap(givenses, lowEnd, (endpoint - 1)); 
-        }//it should happen regardless
-        else {lowEnd++;} //really don't know why this part is necessary
+        }
+        else {lowEnd++;} 
         flipper(givenses, origLow, lowEnd); 
         flipper(givenses, lowEnd + 1, origHigh); 
         }  
     }
     
     public static void quickSorter(int[] toSort) {
-        flipper(toSort, 0, toSort.length); //a quicksort I coded a while ago
-    }
+        flipper(toSort, 0, toSort.length); //a quicksort coded for an earlier 
+    }//project. Not used in this version of the thesis but still here, just 
+    //in case
 
     public static boolean isValidPair(int[] dSeq, int prop1, int prop2) {
+        //inputs: a degree sequence, and two ints representing nodes in the 
+        //sequence which we're proposing to bind to each other 
+        //outputs: the boolean decision of whether or not the proposed bond 
+        //is actually valid under our rules (which are described below) 
         if (dSeq[prop1] == 0 || dSeq[prop2] == 0) {return false;}
         //we do not bond 0's
-        //if (dSeq[prop1] > 1 || dSeq[prop2] > 1) {return true;}
-        //if we're bonding a leaf and a non-leaf
         if (dSeq[prop1] > 1 && dSeq[prop2] > 1) {
             //if we're bonding two non-leaves
-            //System.out.println("Shouldn't be happening.");
-            //maybe not the end of the world after all? Perhaps an 
-            //artifact from an earlier plan. Should return false, of course,
-            //but isn't necessarily supposed to never happen. 
-            //System.out.println(arrayPrint(dSeq));
-            //System.out.println(prop1+","+prop2+".");
-            //System.out.println("AAAAAAAAAAAAAA.");
-            //System.out.println("\n\n\n\n\n\n");
             return false;
-            //this is "trying" to happen, and letting it happen was what was 
-            //causing the zero-calls. Original cause still unclear 1/9/2017
         }
         if (dSeq[prop1] > 1 || dSeq[prop2] > 1) {return true;}
         //if we're bonding a leaf and a non-leaf
@@ -88,17 +190,17 @@ public class GraphCode {
             //if we're proposing bonding two leaves and there's any non-leaf 
             //left in the sequence: abort
         }
-        
         return true; //if we're bonding two leaves and there's nothing else left
     }
     
     public static void cloneMake(
             //copies the elements of [model] into the empty list [blank]
             //in such a way that the elements of [blank] can be altered 
-            //independently from those of [model]. 
+            //independently from those of [model]. Necessary because Java 
+            //[arrayLists] are stored as pointers rather than as copiable 
+            //elements
             ArrayList<ArrayList<Integer>> model, 
-            ArrayList<ArrayList<Integer>> blank
-    ) {
+            ArrayList<ArrayList<Integer>> blank) {
         int outerCount = 0; 
         int innerCount;
         while (outerCount < model.size()) {
@@ -115,9 +217,71 @@ public class GraphCode {
         }
     }
     
+    public static void singleClone(ArrayList<Integer> model, 
+            ArrayList<Integer> blank) {
+        //similar to cloneMake, but with singly-nested [ArrayList]s instead
+        int modelCount = 0;
+        while (modelCount < model.size()) {
+            blank.add(model.get(modelCount));
+            modelCount++;
+        }
+    }
+    
+    public static void plusClone(ArrayList<Integer> model, 
+            ArrayList<Integer> blank) {
+        //similar to singleClone, but adds 1 to all the values it copies 
+        //used much later in a function called [addZero] 
+        int modelCount = 0;
+        while (modelCount < model.size()) {
+            blank.add((model.get(modelCount) + 1));
+            modelCount++;
+        }
+    }
+    
+    public static void tripleClone(ArrayList<ArrayList<ArrayList<Integer>>> 
+            model, ArrayList<ArrayList<ArrayList<Integer>>> blank) {
+        //similar to cloneMake, but with triply-nested [ArrayList]s instead 
+        int outerCount = 0; 
+        int middleCount; 
+        int middleCap; 
+        int innerCount; 
+        int innerCap; 
+        int outerCap = model.size(); 
+        ArrayList<ArrayList<Integer>> middleBlank;
+        ArrayList<ArrayList<Integer>> middleHold; 
+        ArrayList<Integer> innerBlank;
+        ArrayList<Integer> innerHold; 
+        while (outerCount < outerCap) {
+            middleBlank = new ArrayList<ArrayList<Integer>>(); 
+            middleHold = model.get(outerCount);
+            middleCount = 0;
+            middleCap = middleHold.size(); 
+            while (middleCount < middleCap) {
+                innerBlank = new ArrayList<Integer>(); 
+                innerHold = middleHold.get(middleCount);
+                innerCount = 0; 
+                innerCap = innerHold.size(); 
+                while (innerCount < innerCap) {
+                    innerBlank.add(innerHold.get(innerCount));
+                    innerCount++;
+                }
+                middleBlank.add(innerBlank);
+                middleCount++;
+            }
+            blank.add(middleBlank);
+            outerCount++;
+        }
+    }
+    
     public static int[] farthestNode(ArrayList<ArrayList<Integer>> vecinos, 
             int currentSpot, int prevSpot, int totalLength){
-        //a program to find the farthest node from a given node 
+        //inputs: the neighbors listing, and ints representing: 
+        //the current node (initially the start value), the last node visited,
+        //and the length of the chain of nodes visited so far (initially 0)
+        //outputs: an int[] in which one value is that of the current chain 
+        //length, and in which the other is the end-node of the chain
+        //such that, in the very end, the output will be the length of the 
+        //longest chain, and the farthest node from the starting point
         ArrayList<Integer> currents = vecinos.get(currentSpot);
         //get all the neighbors for the current location 
         int currentCount = 0;
@@ -150,7 +314,7 @@ public class GraphCode {
             }
             currentCount++;
         }
-    return sendUp; 
+        return sendUp; 
     }
     
     public static void miniClone(
@@ -174,6 +338,8 @@ public class GraphCode {
         //of the backbone (pre-determined), as well as a value representing
         //the previously-visited node (initially set to -1) and an arrayList
         //containing the backbone being built so far (initially empty)
+        //Outputs: an arrayList<arrayList>> containing the backbone of the 
+        //tree, or else a list signifying that the backbone wasn't found
         ArrayList<Integer> locals = hasSpine.get(start);
         soFar.add(start); //adding the present node to the chain
         int localCount = 0; 
@@ -224,9 +390,9 @@ public class GraphCode {
     
     public static int[] findCenter(ArrayList<ArrayList<Integer>> toFind) {
         //Inputs: an arrayList containing the neighbors of each node 
-        //Outputs: an array containing either the only possible center or 
-        //both possible centers (hard to say initially which it will be, so 
-        //calling contexts must be prepared to handle both cases)
+        //Outputs: an array containing either the only possible center (as an 
+        //int) or both possible centers (hard to say initially which it will 
+        //be, so calling contexts must be prepared to handle both cases)
         int findNotEmpty = 0; 
         while (toFind.get(findNotEmpty).isEmpty() && 
                 findNotEmpty < toFind.size()) {
@@ -237,7 +403,7 @@ public class GraphCode {
         if (findNotEmpty == toFind.size()) {
         //if the entire neighbors list is empty 
             int[] toBack = {-1}; //return an error code of sorts
-            return toBack; //should never happen 
+            return toBack; //should never actually happen, though; never does
         }
         int end1 = farthestNode(toFind, findNotEmpty, -1, 0)[1];
         //find the farthest node from whatever random node we just selected
@@ -263,7 +429,7 @@ public class GraphCode {
     
     public static boolean arrayEquals(String[] array1, String[] array2) {
         //a function to determine if two String[] arrays are equal
-        //probably already exists in the java library, but I wanted my own.  
+        //probably already exists in the java library, but we wanted our own.  
         int length1 = array1.length; 
         int length2 = array2.length; 
         if (length1 != length2) {return false;}
@@ -280,22 +446,12 @@ public class GraphCode {
     public static String stringSort(String[] makeResults, boolean hasZ) {
         //a function to sort the String[] given, and optionally to remove 
         //one of its elements from the final result
+        //Essentially insertionSort, which is fine, given the (relatively)
+        //small sizes of inputs that this function will normally be called for.
+        //Inputs: the String[] to be sorted, and the boolean determining 
+        //whether or not there will be a dummy value to remove (the calling 
+        //context will know). 
         int totalSize = makeResults.length;
-        //if (totalSize == 0) {System.out.println("Zero call.");}
-        //if (totalSize == 0) {return "";} //really don't know why this is 
-        //necessary, since the function should never be called under this 
-        //circumstance, but somewhere along the line, it is. Will figure out 
-        //where and why (seems to no longer be a problem 01/26/17)
-        //also: not weeding out all isomorphisms? Most, but not all 
-        //(we know why this is now; see below node 01/26/17)
-        //FOR TESTING PURPOSES
-        /*System.out.println("Before sorting: ");
-        int preCheck = 0;
-        while (preCheck < totalSize) {
-            System.out.print(makeResults[preCheck] + "_"); 
-            preCheck++;
-        }//END TESTS
-        System.out.println("");*/
         int arraySize;
         if (hasZ) {arraySize = totalSize - 1;}
         else {arraySize = totalSize;}
@@ -319,9 +475,10 @@ public class GraphCode {
                 //if it's not the parent
                 while (placeCount < totalSize) {
                     toCompare = makeResults[placeCount];
-                    if (!toCompare.equals("z") && (toPlace.compareTo(toCompare) > 0)) {
-                        //if it's being compared to some string other than the parent
-                        //and it proves greater 
+                    if (!toCompare.equals("z") && (toPlace.compareTo(toCompare) 
+                            > 0)) {
+                        //if it's being compared to something besides the parent
+                        //and it turns out to be greater 
                         finalCount++;
                     }//then augment its place in the final array.  
                     placeCount++; //This always increases. 
@@ -340,21 +497,26 @@ public class GraphCode {
             sortCount++;
         }
         String rohirrim = "";
-        //FOR TESTING PURPOSES (though not exclusively so)
+        //with the array in order, we still need to build the string to return
         int horseCount = 0; 
         while (horseCount < sortedStuff.length) {
             rohirrim = rohirrim + sortedStuff[horseCount]; 
             horseCount++;
         }
-        //System.out.println("After sorting: "+rohirrim+"."); 
-        //END TESTS
         return rohirrim;
     }
     
     public static String strictDescript(ArrayList<ArrayList<Integer>> repr, 
             int curNod, int prevNod, int[] origRep) {
+        //a function for building canonical names to detect isomorphism 
+        //up-to-original-degree. 
+        //Inputs: the node which this recursive call should focus on 
+        //(initially the "center", or one of them); the node which the 
+        //previous recursive call focused on (initially -1, which is to say 
+        //"none"), the representation which needs a canonical name, and the 
+        //original degree sequence that gave rise to it 
         if (repr.get(curNod).size() == 1) {
-            return "1b";
+            return Integer.toString(origRep[curNod])+"b";
         }
         ArrayList<Integer> locality = repr.get(curNod); 
         int allaKinder = locality.size();
@@ -375,17 +537,20 @@ public class GraphCode {
             kinderCount++;
         }
         String sortedStr = stringSort(answers, hasNote);
-        //and here lies the main difference between this and makeDescript
         return Integer.toString(origRep[curNod])+sortedStr+"b";
     }
     
     public static String makeDescript(ArrayList<ArrayList<Integer>> repper, 
             int curNode, int prevNode) {
+        //a function for building canonical names to detect isomorphism 
+        //(not up-to-original-degree, just isomorphism in general). 
+        //Inputs: the node which this recursive call should focus on 
+        //(initially the "center", or one of them); the node which the 
+        //previous recursive call focused on (initially -1, which is to say 
+        //"none"), and the representation which needs a canonical name 
         if (repper.get(curNode).size() == 1) {
             //if we've hit a leaf, then the neighbors list will be of size 1
             return "ab";
-            //yet this may not be catching all the leaves somehow? 
-            //now it is, it seems like 01/26/17
         }
         //otherwise: recursive calls on all the children nodes
         //and we'll need to arrange them in some semblance of order
@@ -419,105 +584,99 @@ public class GraphCode {
         return "a"+sortedString+"b";
     }
     
-    public static boolean areIsomorphic(ArrayList<ArrayList<Integer>> thing1, 
-            ArrayList<ArrayList<Integer>> thing2, boolean isStrict, 
-            int[] startSeq) {
-        //determines if the tree represented by [thing1] 
-        //is isomorphic to that represented by [thing2]
-        //but: as it turns out, doing in-line isomorphism removal closes 
-        //off possibilities. Must design a stricter qualification for that
-        /*boolean testCase = false;
-        if (thing1.get(7).size() > 1 && thing1.get(7).get(1) == 5) {
-            if (thing1.get(5).size() > 1 && thing1.get(5).get(1) == 4) {
-                if (thing1.get(4).size() > 1 && thing1.get(4).get(1) == 3) {
-                    testCase = true; 
-                }
-            }
-        }*/
-
-        int[] center1 = findCenter(thing1); 
-        int[] center2 = findCenter(thing2);
-        if (center1.length != center2.length) {
-            //if one tree has one center but the other has two 
-            return false; 
-        }
-        String treeRep1; 
-        String treeRep2; 
-        if (isStrict) {
-            treeRep1 = strictDescript(thing1, center1[0], -1, startSeq);
-            treeRep2 = strictDescript(thing2, center2[0], -1, startSeq);
-        }
-        else {
-            treeRep1 = makeDescript(thing1, center1[0], -1); 
-            treeRep2 = makeDescript(thing2, center2[0], -1);
-        }
-        String treeRep1part2 = "";
-        
-        //given the trees as arrayLists, the center nodes, and a default 
-        //value of -1, we get a String for each tree which should be unique 
-        //to that tree and all its isomorphisms
-        /*if (testCase) {
-            System.out.println("TEST CASE /n/n/n/n/n/n"); 
-            System.out.println(thing1);
-            System.out.println(thing2);
-            System.out.println(arrayPrint(center1));
-            System.out.println(arrayPrint(center2));
-            System.out.println(treeRep1);
-            System.out.println(treeRep2);
-        }*/
-        if (treeRep1.equals(treeRep2)) {
-            return true;
-        }
-        if (center1.length > 1) {
-            //if both trees have two centers, its possible that we tested 
-            //the wrong ones against each other 
-            if (isStrict) {
-                treeRep1part2 = strictDescript(thing1, center1[1], -1, 
-                        startSeq);
-            }
-            else {
-                treeRep1part2 = makeDescript(thing1, center1[1], -1);
-            }
-            //so we'll test the other possible pairing 
-            if (treeRep1part2.equals(treeRep2)) {
-                return true; 
-            }
-        }
-        return false; 
+    public static String makeARep(ArrayList<ArrayList<Integer>> taken, 
+            int[] initiaSeq) {
+        //makes a canonical name of the input realization (up-to-original-
+        //degree). 
+        int[] centers = findCenter(taken);
+        String treeRep1 = strictDescript(taken, centers[0], -1, initiaSeq);
+        return treeRep1; //inline version
     }
     
-    public static ArrayList<ArrayList<ArrayList<Integer>>> isomorphRemove(
+    public static String makeBasicRep(ArrayList<ArrayList<Integer>> taken, 
+            int[] initiaSeq) {
+        //makes a canonical name of the input realization (not up-to-original
+        //degree). 
+        int[] centers = findCenter(taken);
+        String treeRep1 = makeDescript(taken, centers[0], -1);
+        return treeRep1; //basic version
+    }
+
+    public static String makeOtherRep(ArrayList<ArrayList<Integer>> taken, 
+            int[] initiaSeq) {
+        //makes the up-to-original-degree canonical name for the input 
+        //sequence based on the "second" center, if one exists. Returns "zilch"
+        //if it doesn't. 
+        int[] centers = findCenter(taken);
+        if (centers.length != 2) {return "zilch";}
+        String treeRep2 = strictDescript(taken, centers[1], -1, initiaSeq);
+        return treeRep2; //inline version
+    }
+    
+    public static String makeOtherBasicRep(ArrayList<ArrayList<Integer>> taken, 
+            int[] initiaSeq) {
+        //makes the not up-to-original-degree canonical name for the input 
+        //sequence based on the "second" center, if one exists. Returns "zilch"
+        //if it doesn't. 
+        int[] centers = findCenter(taken);
+        if (centers.length != 2) {return "zilch";}
+        String treeRep2 = makeDescript(taken, centers[1], -1);
+        return treeRep2; //basic version
+    }
+    
+    public static ArrayList<ArrayList<ArrayList<Integer>>> fastRemove(
             ArrayList<ArrayList<ArrayList<Integer>>> givens, 
             boolean strictVersion, int[] primaSeq) {
-        //inputs: an arrayList containing trees, themselves represented as 
-        //arraylists
+        //a function to remove all isomorphisms from a collection of tree 
+        //realizations of a given degree sequence. Named because it runs 
+        //much more quickly than our original function for this purpose. 
+        //Inputs: an arrayList containing trees, themselves represented as 
+        //arrayLists, and a boolean determining whether we want removal
+        //up-to-original-degree or removal in general ([false] for general) 
+        //and the original sequence (which is only used if [strictVersion] is 
+        //true, but we require it regardless)
         //Outputs: a similar arraylist containing trees, but with all 
-        //isomorphisms removed 
+        //isomorphisms removed, under whatever paradigm was selected by 
+        //[strictVersion]
         ArrayList<ArrayList<ArrayList<Integer>>> emptyStart = 
                 new ArrayList<ArrayList<ArrayList<Integer>>> (); 
+        String[] allUniques = new String[10];
+        String[] uniqueDoubles = new String[10];
+        int uniqueCount = 0; 
         int realizeCount = 0; 
         int emptyCount; 
         boolean isAnIsomorphism; 
         ArrayList<ArrayList<Integer>> currentRealization; 
+        String currentRep;
+        String currentRep2; 
         ArrayList<ArrayList<Integer>> toCheck;
+        String stringCheck;
+        String stringCheck2;
         while (realizeCount < givens.size()) {
             //for every tree in the input arrayList
             isAnIsomorphism = false; 
             emptyCount = 0; 
             currentRealization = givens.get(realizeCount);
-            while (emptyCount < emptyStart.size() && (!isAnIsomorphism)) {
+            if (strictVersion) {
+                currentRep = makeARep(currentRealization, primaSeq);
+                currentRep2 = makeOtherRep(currentRealization, primaSeq);
+            }
+            else {
+                currentRep = makeBasicRep(currentRealization, primaSeq);
+                currentRep2 = makeOtherBasicRep(currentRealization, primaSeq);
+            }
+            stringCheck = "Q";
+            if (realizeCount == 0) {emptyCount = allUniques.length;}
+            while (emptyCount < uniqueCount && (!isAnIsomorphism)) {
                 //for every tree we're planning to return as non-isomorphic
-                toCheck = emptyStart.get(emptyCount); 
-                if (areIsomorphic(currentRealization, toCheck, strictVersion, 
-                        primaSeq)) {
+                stringCheck = allUniques[emptyCount]; 
+                stringCheck2 = uniqueDoubles[emptyCount];
+                if (stringCheck.equals(currentRep) || 
+                        stringCheck2.equals(currentRep) ||
+                        stringCheck.equals(currentRep2)) {
                     //if the current tree is isomorphic to one we're already
                     //planning to return, under the conditions requested: 
                     //flag it as such
-                    System.out.println("");
-                    System.out.println(currentRealization);
-                    System.out.println("is isomorphic to"); 
-                    System.out.println(toCheck);
-                    System.out.println("under conditions "+strictVersion);
                     isAnIsomorphism = true; 
                 }
                 emptyCount++;
@@ -525,6 +684,13 @@ public class GraphCode {
             if (!isAnIsomorphism) {
                 //if the tree isn't isomorphic to anything we've seen so far: 
                 emptyStart.add(currentRealization);
+                allUniques[uniqueCount] = currentRep;
+                uniqueDoubles[uniqueCount] = currentRep2;
+                uniqueCount++;
+                if (allUniques.length - 1 == uniqueCount) {
+                    allUniques = stringDouble(allUniques);
+                    uniqueDoubles = stringDouble(uniqueDoubles);
+                }
             }
             realizeCount++;
         }
@@ -534,12 +700,11 @@ public class GraphCode {
     public static ArrayList<ArrayList<ArrayList<Integer>>> treeTwo(
             ArrayList<ArrayList<Integer>> inputs, 
             int[] degreeSeq, int[] origSeq) {
-        //inputs: the degree sequence and an empty tree holder
-        //outputs: the list of all non-isomorphic trees matching the 
+        //the function for Algorithm A (and the framework for B). 
+        //Inputs: the degree sequence and an empty tree holder
+        //and the original sequence, not modified between calls 
+        //Outputs: the list of all non-isomorphic trees matching the 
         //input degree sequence 
-        if (degreeSeq.length >= 8 && degreeSeq[7] == 1) {
-            System.out.println(arrayPrint(degreeSeq));
-        }
         int counter = 0;
         int countup; 
         int[] outClone;
@@ -555,6 +720,19 @@ public class GraphCode {
             //will always be adding a blank arrayList, while it calls downwards
             return sendback;
         }
+        ArrayList<ArrayList<Integer>> baseClone;
+        if (counter == (degreeSeq.length - 2)) {
+            //if almost the entire degree sequence is zeroes 
+            //and the remainder is a trivial base case which we can hardcode 
+            baseClone = new ArrayList<ArrayList<Integer>>(); 
+            cloneMake(inputs, baseClone);
+            if (degreeSeq[counter] != 1) {System.out.println("Error");}
+            if (degreeSeq[counter + 1] != 1) {System.out.println("Error");}
+            baseClone.get(counter).add(counter+1);
+            baseClone.get(counter+1).add(counter);
+            sendback.add(baseClone);
+            return sendback; 
+        }
         ArrayList<ArrayList<Integer>> resultClone = 
                 new ArrayList<ArrayList<Integer>>();
         int resultCount; 
@@ -569,24 +747,9 @@ public class GraphCode {
                 ArrayList<ArrayList<ArrayList<Integer>>> results = 
                         treeTwo(inputs, outClone, origSeq);
                 //and get back all the ways of making trees out of what's left
-                //here would be the place to target isomorphisms
-                //results = isomorphRemove(results); //PUT THIS BACK IN
-                //Removing isomorphisms as we go doesn't work. The reason for 
-                //this is that lower-level trees are not the platonic ideal of 
-                //such trees: they have specific numbers attached, which upper-
-                //level calling contexts may interpret in different ways, 
-                //closing off possibilities while doing nothing but removing
-                //isomorphisms. Removing isomorphisms at the "end" still 
-                //works. Avenues forward include: making the lower-level trees 
-                //closer to platonic, making the upper-level bonds closer to 
-                //platonic, and finding some "stricter" qualifier for 
-                //isomorphism that is clever enough not to trim branches on 
-                //the tree of possibilities. 
                 resultCount = 0;
-                System.out.println("This round's results: ");
                 while (resultCount < results.size()) {
                 //for all the ways of making trees out of what's left:
-                    System.out.println(results.get(resultCount));
                     resultClone = new ArrayList<ArrayList<Integer>>();
                     cloneMake(results.get(resultCount), resultClone);
                     //make a clone of that particular way 
@@ -597,46 +760,753 @@ public class GraphCode {
                     //and add the updated way to the return clump 
                     resultCount++;
                 }
-                System.out.println("End results.");
             }
                 countup++;
         }
-        //In-line removal seems to be working with the modified isomorphism
-        //check, and working noticeably faster at that 01/28/17
-        sendback = isomorphRemove(sendback, true, origSeq);
+        //sendback = fastRemove(sendback, true, origSeq);
+        //Include the above line to invoke our implementation of Algorithm B. 
+        //Without it, this will run as Algorithm A. The implementation of B 
+        //is still error-prone; any attempts at bug-fixing are encouraged. 
         return sendback;
+    }
+    
+    public static ArrayList<ArrayList<ArrayList<Integer>>> searchTheTree(
+            int[] orderedSeq, treeOfTrees toFind, int curPlace) {
+        //the linear-time retrieval algorithm for class treeOfTrees, 
+        //to return the realizations corresponding to the desired degree 
+        //sequence. We decided to have this function be separate from class
+        //treeOfTrees. 
+        //Inputs: the sequence to search for, and the treeOfTrees to search, 
+        //and a placeholder value (initially 0, eventually the length of 
+        //[orderedSeq] - 1) 
+        //Outputs: the realizations corresponding to [orderedSeq], or 
+        //a [null] pointer if [orderedSeq] hasn't been properly inserted into 
+        //[toFind]. (This will never happen in the contexts we've created.) 
+        
+        if (toFind.listing != null) {return toFind.listing;}
+        //if we're already at the leaf
+        //[offspring] is of the type ArrayList<treeOfTrees> 
+        int offCount = 0; 
+        int offMany = toFind.offspring.size(); 
+        int toMatch = orderedSeq[curPlace];
+        while (offCount < offMany) {
+            if (toMatch == toFind.offspring.get(offCount).childID) {
+                return searchTheTree(orderedSeq, 
+                        toFind.offspring.get(offCount), curPlace - 1);
+            }
+            offCount++;
+        }
+        System.out.println("Child not found error"); //should never get here
+        System.out.println("811");
+        return toFind.listing;
+    }
+    
+    public static void switchTheTree(
+            ArrayList<ArrayList<ArrayList<Integer>>> toSwitch, 
+            int firstSwitch, int secondSwitch) {
+        //a function for interchanging two elements in a tree realization
+        //Inputs: the realization to be switched, and the positions which 
+        //should be switched 
+        int allCount = 0; 
+        int allCap = toSwitch.size(); 
+        int firstCap; 
+        int firstCount;
+        int secondCap; 
+        int secondCount;
+        ArrayList<Integer> valsHold; 
+        while (allCount < allCap) {
+            valsHold = new ArrayList<Integer>(); 
+            firstCap = toSwitch.get(allCount).get(firstSwitch).size(); 
+            firstCount = 0; 
+            while (firstCount < firstCap) {
+                valsHold.add(toSwitch.get(allCount).
+                        get(firstSwitch).get(firstCount));
+                firstCount++;
+            }//essentially copying the elements of the first list into valHold
+            toSwitch.get(allCount).get(firstSwitch).clear();
+            secondCount = 0; //that line is fine because the vals are saved 
+            secondCap = toSwitch.get(allCount).get(secondSwitch).size();
+            while (secondCount < secondCap) {
+                toSwitch.get(allCount).get(firstSwitch).add(
+                      toSwitch.get(allCount).get(secondSwitch).get(secondCount)
+                );
+                secondCount++;
+            }//move all the second list's elements into list one 
+            toSwitch.get(allCount).get(secondSwitch).clear();
+            firstCount = 0; 
+            while (firstCount < firstCap) {//move all the hold vals into 
+                toSwitch.get(allCount).get(secondSwitch). //the second list
+                        add(valsHold.get(firstCount));
+                firstCount++;
+            }
+            allCount++;
+        }
+        
+        //the next part switches the references. In other words, if we're 
+        //switching vertices 3 and 7, and some other vertex was neighbors 
+        //only with vertex 3, it will henceforth be neighbors only with 
+        //vertex 7. 
+        allCount = 0; 
+        int middleCount; 
+        int middleCap; 
+        int innerCount; 
+        int innerCap; 
+        while (allCount < allCap) {
+            middleCount = 0; 
+            middleCap = toSwitch.get(allCount).size(); 
+            while (middleCount < middleCap) {
+                innerCount = 0; 
+                innerCap = toSwitch.get(allCount).get(middleCount).size(); 
+                while (innerCount < innerCap) {
+                    if (toSwitch.get(allCount).get(middleCount).get(innerCount) 
+                            == firstSwitch) {
+                        toSwitch.get(allCount).get(middleCount).
+                                remove(innerCount); 
+                        toSwitch.get(allCount).get(middleCount).add(innerCount, 
+                                secondSwitch); 
+                    }
+                    else if (toSwitch.get(allCount).get(middleCount).
+                            get(innerCount) == secondSwitch) {
+                        toSwitch.get(allCount).get(middleCount).
+                                remove(innerCount); 
+                        toSwitch.get(allCount).get(middleCount).add(innerCount, 
+                                firstSwitch); 
+                    }
+                    
+                    innerCount++;
+                }
+                middleCount++;
+            }
+            allCount++;
+        }
+    }
+    
+    public static ArrayList<ArrayList<ArrayList<Integer>>> addZero(
+        ArrayList<ArrayList<ArrayList<Integer>>> toBeAdded) {
+        //adds a disconnected "zero" vertex to the given realization. 
+        //Inputs: the realization to be added to 
+        //Outputs: the added realization. 
+        int highCount = 0; 
+        int highCap = toBeAdded.size(); 
+        ArrayList<Integer> neighborClone;  
+        int endingSize; 
+        int origSize; 
+        //int removeSize; 
+        while (highCount < highCap) {
+            endingSize = toBeAdded.get(highCount).size(); 
+            origSize = endingSize; 
+            while (endingSize > 0) {
+                neighborClone = new ArrayList<Integer>(); 
+                plusClone(toBeAdded.get(highCount).get(endingSize - 1), 
+                        neighborClone);
+                if (endingSize < origSize) {
+                    toBeAdded.get(highCount).remove(endingSize); 
+                }
+                toBeAdded.get(highCount).add(endingSize, neighborClone); 
+                endingSize--;
+            }
+            neighborClone = new ArrayList<Integer>(); 
+            toBeAdded.get(highCount).remove(0);
+            toBeAdded.get(highCount).add(0, neighborClone);
+            endingSize = toBeAdded.get(highCount).size();
+            origSize++;
+            highCount++;
+        }
+        return toBeAdded;
+    }
+    
+    public static ArrayList<ArrayList<ArrayList<Integer>>> treeLookUp(
+            int[] unorderedSeq, treeOfTrees toSearch) {
+        //a helper function for [searchTheTree]. Formats the sequence
+        //so that it matches one already computed and stored, then calls 
+        //[searchTheTree]. 
+        //Inputs: the original sequence (which will, at most, have two 
+        //elements out of order, and will include a zero), along with the 
+        //treeOfTrees to search. 
+        //Outputs: the list of realizations corresponding to [unorderedSeq], 
+        //found in [toSearch]. 
+        int countUp = 1; 
+        int firstPosit = -1; //default values because java complains otherwise
+        int secondPosit = -1; //they'll be initialized if/when they're needed 
+        if (unorderedSeq[0] != 0) {System.out.println("Error 918");}
+        boolean bothFound = false;
+        while (countUp < unorderedSeq.length && !bothFound) {
+            if (unorderedSeq[countUp] < unorderedSeq[countUp - 1]) {
+                secondPosit = countUp; 
+                while (!bothFound) {
+                    countUp--; 
+                    if (countUp == 0) {System.out.println("Error 925");}
+                    if (unorderedSeq[countUp] <= unorderedSeq[secondPosit]) {
+                        firstPosit = countUp; 
+                        bothFound = true;
+                    }
+                }
+            }
+            countUp++;
+        }
+        //by this point, either the array was in nondecreasing order the whole 
+        //time, or else we've identified the one place [secondPosit] where it's 
+        //not, and the place [firstPosit] where it would need to go so that it 
+        //would be in order. The boolean value [bothFound] will be [true] in 
+        //that second case, and [false] in the first. 
+        if (bothFound) {
+            //if the array really was one element out of order
+            swap(unorderedSeq, firstPosit + 1, secondPosit); //fix it 
+        }
+        //by now, [unorderedSeq] will, in theory, be the same as some sequence
+        //we've already computed, minus the leading zero, and whose results 
+        //we've already stored in [toSearch], minus the leading zero. 
+        ArrayList<ArrayList<ArrayList<Integer>>> foundHold = new 
+                ArrayList<ArrayList<ArrayList<Integer>>>();
+        
+        tripleClone(searchTheTree(unorderedSeq, toSearch, 
+                unorderedSeq.length - 1), foundHold);
+        //by now, [foundHold] is functionally equal to whatever 
+        //[searchTheTree] gave us, but can be altered independently. 
+        foundHold = addZero(foundHold); 
+        if (bothFound) {
+            switchTheTree(foundHold, firstPosit + 1, secondPosit); 
+        }
+        return foundHold; 
+    }
+    
+    public static int[] howManyOfSize(ArrayList<ArrayList<Integer>> toDetermine, 
+            int targetSize, int doNotBond) {
+        //a function specifically for Algorithm C, to determine how many 
+        //vertices there exist in a given realization that match a certain  
+        //value, and to return their position indices 
+        //Inputs: the realization to search, the value to match, and an [int] 
+        //representing a value not to select even if it does match 
+        int detCap = toDetermine.size(); 
+        int detCount = 0; 
+        int totals = 0; 
+        int negCount; 
+        int[] totalSend = new int[2];
+        totalSend[0] = -1; 
+        totalSend[1] = -1;
+        while (detCount < detCap) {
+            if (toDetermine.get(detCount).size() == targetSize && detCount != doNotBond) {
+                totalSend[totals] = detCount;
+                totals++;
+                if (totals == totalSend.length) {
+                    negCount = totals; 
+                    totalSend = arrayDouble(totalSend); 
+                    while (negCount < totalSend.length) {
+                        totalSend[negCount] = -1;
+                        negCount++;
+                    }
+                }
+            }
+            detCount++;
+        }
+        return totalSend; 
+    }
+    
+    public static ArrayList<ArrayList<ArrayList<Integer>>> treeThree(
+            ArrayList<ArrayList<Integer>> inputs, 
+            int[] degreeSeq, int[] origSeq, treeOfTrees reference) {
+        //Our (correct) implementation of Algorithm C. 
+        //Takes a degree sequence and returns its realizations. 
+        //inputs: the degree sequence and an empty tree holder
+        //and the original sequence, not modified between calls
+        //not to mention a tree-of-trees so that some previously computed 
+        //information can be saved
+        //outputs: the list of all non-isomorphic trees matching the 
+        //input degree sequence 
+        int counter = 0;
+        int countup; 
+        int[] outClone;
+        ArrayList<ArrayList<ArrayList<Integer>>> sendback = 
+                new ArrayList<ArrayList<ArrayList<Integer>>>();
+        //to contain the results. You'll see
+        while (counter < degreeSeq.length && degreeSeq[counter] == 0) {
+            counter++;//finding the first non-zero entry in the degree sequence
+        }
+        if (counter == degreeSeq.length) {
+            //if the entire degree sequence is zeroes 
+            sendback.add(inputs);
+            //will always be adding a blank arrayList, while it calls downwards
+            return sendback;
+        }
+        ArrayList<ArrayList<Integer>> baseClone;
+        if (counter == (degreeSeq.length - 2)) {
+            //if almost the entire degree sequence is zeroes 
+            //and the remainder is a trivial base case which we can hardcode 
+            baseClone = new ArrayList<ArrayList<Integer>>(); 
+            cloneMake(inputs, baseClone);
+            if (degreeSeq[counter] != 1) {System.out.println("Error");
+                System.out.println("971");
+            }
+            if (degreeSeq[counter + 1] != 1) {System.out.println("Error");
+                System.out.println("974");
+            }
+            baseClone.get(counter).add(counter+1);
+            baseClone.get(counter+1).add(counter);
+            sendback.add(baseClone);
+            return sendback; 
+        }
+        ArrayList<ArrayList<Integer>> resultClone = 
+                new ArrayList<ArrayList<Integer>>();
+        int resultCount; 
+        countup = counter + 1;
+        int firstSwap = -1; 
+        int secondSwap = -1; 
+        int targetDegree; 
+        boolean swapped; 
+        int[] manyTargets; 
+        int targetCount;
+        int curTarget;
+        boolean fini;
+        while (countup < degreeSeq.length) {
+            if (isValidPair(degreeSeq, counter, countup)){
+            //if we've found a valid link to make 
+                outClone = degreeSeq.clone();
+                outClone[counter] = outClone[counter] - 1; 
+                outClone[countup] = outClone[countup] - 1;
+                //form the link in our degree sequence
+                targetDegree = outClone[countup]; //and keep track of the 
+                //newly reduced degree of the node we just bonded to 
+                ArrayList<ArrayList<ArrayList<Integer>>> results = 
+                        //treeThree(inputs, outClone, origSeq);
+                        treeLookUp(outClone, reference); 
+                //and get back all the ways of making trees out of what's left
+                resultCount = 0;
+                while (resultCount < results.size()) {
+                //for all the ways of making trees out of what's left:
+                    resultClone = new ArrayList<ArrayList<Integer>>();
+                    cloneMake(results.get(resultCount), resultClone);
+                    manyTargets = howManyOfSize(resultClone, targetDegree, 
+                            counter);
+                        targetCount = 0;
+                        fini = false; 
+                        while (targetCount < manyTargets.length & !fini) {
+                            resultClone = new ArrayList<ArrayList<Integer>>(); 
+                            cloneMake(results.get(resultCount), resultClone); 
+                            curTarget = manyTargets[targetCount]; 
+                            if(curTarget==-1) {fini = true;}
+                            if(!fini) {
+                                resultClone.get(curTarget).add(counter);
+                                resultClone.get(counter).add(curTarget);
+                                sendback.add(resultClone);
+                                targetCount++;
+                            }
+                        }
+                    resultCount++;
+                }
+            }
+                countup++;
+        }
+        return sendback;
+    }
+    
+    public static ArrayList<ArrayList<Integer>> seqMaker(
+            int nodeCount, int totalDegrees, int prevCap) {
+        //generates all tree-able degree sequences with 
+        //as many nodes as nodeCount
+        //totalDegrees should originally be set to 2 * (nodeCount - 1)
+        //and prevCap should originally be set to nodeCount, though it later
+        //varies independently of nodeCount
+        //nodeCount <= totalDegrees < 2(nodeCount - 1) over all invocations
+        //also all trees have at least two leaves 
+        ArrayList<ArrayList<Integer>> conseguir = new ArrayList<ArrayList<Integer>>();
+        ArrayList<Integer> container = new ArrayList<Integer>();
+        if (nodeCount == totalDegrees) {
+            //if this invocation of seqMaker has reached a point 
+            //where the remainder of the sequence can only be filled 
+            //with leaves (i.e. if we have have exactly as many degrees 
+            //remaining as we have places to put them)
+            int degreeCount = 0; 
+            while (degreeCount < totalDegrees) {
+                container.add(1);
+                degreeCount++;
+            }
+            conseguir.add(container); //only one way of filling in the rest, 
+            return conseguir; //so only one sub-realization is returned
+        }
+        //otherwise: we have options 
+        int capClone = prevCap;
+        ArrayList<ArrayList<Integer>> holdStuff; //this will hold our options
+        ArrayList<Integer> holdNest; //this will hold a single option
+        //capClone is essentially a way of conveying to the subcalls what's 
+        //already been tried. We don't want any subcall trying any degrees 
+        //larger than whatever value of [capClone] we pass to it
+        while (capClone > 1) { 
+            if (!((totalDegrees - capClone) < (nodeCount - 1))) {
+            //basically: in the recursive calls, there's going to be exactly 
+            //[nodeCount - 1]-many slots to be filled, so we need at least 
+            //[nodecount - 1]-many degrees left to fill them. The recursive 
+            //calls must not try to include a single degree which is "too big",
+            //and we choose capClone accordingly to prevent it. 
+                holdStuff = seqMaker((nodeCount - 1), (totalDegrees - 
+                        capClone), capClone);
+                //get the recursive result in [holdStuff]
+                int holdSize = holdStuff.size();
+                int holdCount = 0; 
+                while (holdCount < holdSize) {
+                    holdNest = new ArrayList<Integer>();
+                    singleClone(holdStuff.get(holdCount), holdNest);
+                    //[holdStuff] will consist of a list of possibilities
+                    //and we use [holdNest] to create independent clones 
+                    //for each of them 
+                    holdNest.add(capClone);//and, on to the end of each, we add
+                    //the single degree which we selected in the context of 
+                    //this call. Then we add [holdNest] to the return group
+                    conseguir.add(holdNest); 
+                    holdCount++;
+                }
+            }
+            capClone--;
+        }
+        return conseguir;
+    }
+    
+    public static int[] converter(ArrayList<Integer> inputs) {
+        //converts an arrayList<Integer> into an int[]
+        int totalCount = inputs.size();
+        int[] converts = new int[totalCount]; 
+        int descender = totalCount - 1; 
+        while (descender >= 0) {
+            converts[descender] = inputs.get(descender);
+            descender--;
+        }
+        return converts;
+    }
+    
+    public static void arrayClone(int[] model, int[] blank) {
+        //creates an int[] clone of the int[] model which can be altered 
+        //independently of the original
+        int capVal = model.length;
+        int curVal = 0; 
+        while (curVal < capVal) {
+            blank[curVal] = model[curVal];
+            curVal++;
+        }
+    }
+    
+    public static int[] arrayDouble(int[] base) {
+        //returns an array with the same values as input [base]
+        //but twice as long 
+        //with all the remaining inputs being set to -1 initially
+        int baseSize = base.length;
+        int[] doubled = new int[baseSize * 2];
+        int baseCount = 0; 
+        while (baseCount < baseSize) {
+            doubled[baseCount] = base[baseCount]; 
+            baseCount++;
+        }
+        baseSize = baseSize * 2; 
+        while (baseCount < baseSize) {
+            doubled[baseCount] = 0; 
+            baseCount++;
+        }
+        return doubled;
+    }
+    
+    public static String[] stringDouble(String[] base) {
+        //returns an array with the same values as input [base]
+        //but twice as long 
+        //with all the remaining inputs being set to "" initially
+        int baseSize = base.length;
+        String[] doubled = new String[baseSize * 2];
+        int baseCount = 0; 
+        while (baseCount < baseSize) {
+            doubled[baseCount] = base[baseCount]; 
+            baseCount++;
+        }
+        baseSize = baseSize * 2; 
+        while (baseCount < baseSize) {
+            doubled[baseCount] = ""; 
+            baseCount++;
+        }
+        return doubled;
+    }
+    
+    public static int tryAllSeqsOfLength(int size) {
+        //does what it says on the tin 
+        //and prints the sequence with size [size] with the most non-isomorphic
+        //representations, and returns the exact count of those representations
+        ArrayList<ArrayList<Integer>> allSeqs = (
+                seqMaker(size, 2*(size - 1), size)
+                );
+        //generates all possible tree sequences of length [size]
+        int howManySeqs = allSeqs.size(); 
+        int bestWeveSeen = -1;
+        int seqCount = 0; 
+        
+        int[] realizeDistrib = {0, 0}; 
+        int[] realizeClone; 
+        //this will come to contain all the realization counts 
+        //such that realizeDistrib[n] will be the number of degree sequences 
+        //with n-many realizations, and so forth
+        
+        ArrayList<ArrayList<Integer>> blankList; 
+        ArrayList<Integer> seqList = new ArrayList<Integer>();
+        ArrayList<Integer> seqClone;
+        ArrayList<ArrayList<ArrayList<Integer>>> holdVals;
+        //startup values
+        int blankCount;
+        int[] sendSeq;
+        int[][] printSeq = new int[size][10];
+        int negCount; 
+        int howMany;
+        while (seqCount < howManySeqs) {
+            //once for every possible sequence of length [size]
+            blankList = new ArrayList<ArrayList<Integer>>();
+            //reset the empty two-dimensional arrayList parameter
+            //now to initialize the empty two-dimensional arrayList
+            //containing a precise amount of empty one-dimensional arrayLists
+            blankCount = 0;
+            while (blankCount < size) {
+                seqClone = new ArrayList(seqList); 
+                //have to repeatedly clone seqList due to some Java quirk 
+                blankList.add(seqClone);
+                blankCount++;
+            }
+            holdVals = new ArrayList<ArrayList<ArrayList<Integer>>>();
+            //reset the tree-representation holder every time
+            sendSeq = converter(allSeqs.get(seqCount));
+            //and convert the tree sequence of the day into a workable form
+            //and away we go
+            int[] sendClone = new int[sendSeq.length];
+            arrayClone(sendSeq, sendClone);
+            holdVals = treeTwo(blankList, sendSeq, sendClone);
+            holdVals = fastRemove(holdVals, false, sendSeq); 
+            howMany = holdVals.size(); 
+            
+            if (howMany > bestWeveSeen) {
+                //if this tree has more non-isomorphic representations than 
+                //the others 
+                bestWeveSeen = howMany;
+                printSeq = new int[size][10];
+                negCount = 0; 
+                while (negCount < 10) {
+                    printSeq[0][negCount] = -1;
+                    negCount++;
+                }
+                negCount = 0; 
+                while (negCount < size) {
+                    printSeq[negCount][0] = sendSeq[negCount]; 
+                    negCount++;
+                }
+            }
+            else if (howMany == bestWeveSeen) {
+                negCount = 0; 
+                while (printSeq[0][negCount] != -1) {negCount++;}
+                blankCount = negCount; 
+                negCount = 0;
+                while (negCount < size) {
+                    printSeq[negCount][blankCount] = sendSeq[negCount]; 
+                    negCount++;
+                }
+            }
+            
+            while (howMany >= realizeDistrib.length) {
+                //if we're trying to make an entry for the first sequence 
+                //with, for example, five realizations, 
+                //and we only have room for sequences up to four at the moment, 
+                //then double the size of the preexisting array 
+                realizeClone = arrayDouble(realizeDistrib);
+                realizeDistrib = new int[realizeClone.length];
+                arrayClone(realizeClone, realizeDistrib);
+            }
+            realizeDistrib[howMany] = realizeDistrib[howMany] + 1;
+            //increase the number of n-realization sequences by 1 
+            
+            seqCount++;
+        }
+        System.out.println("For all sequences of length "+size+":");
+        if (printSeq[0][1] == -1) {
+        System.out.println("The sequence with the most representations is");
+        System.out.println(dualPrint(printSeq, 0, size));
+        }
+        else {
+        System.out.println("The sequences with the most representations are");
+        negCount = 0; 
+        while (printSeq[0][negCount] != -1) {
+            System.out.println(dualPrint(printSeq, negCount, size));
+            negCount++;
+        }
+        }
+        System.out.println("With "+bestWeveSeen+" representation(s).");
+        System.out.println("Additionally, the distribution is as follows: ");
+        System.out.println(arrayPrint(realizeDistrib));
+        
+        return bestWeveSeen;
+    }
+    
+        public static treeOfTrees tryAllSeqsOfLengthWithTrees(int size, 
+                treeOfTrees infoTree) {
+        //does what it says on the tin 
+        //and prints the sequence with size [size] with the most non-isomorphic
+        //representations, and returns the exact count of those representations
+        ArrayList<ArrayList<Integer>> allSeqs = (
+                seqMaker(size, 2*(size - 1), size)
+                );
+        //generates all possible tree sequences of length [size]
+        int howManySeqs = allSeqs.size(); 
+        int bestWeveSeen = -1;
+        int seqCount = 0; 
+        
+        int[] realizeDistrib = {0, 0}; 
+        int[] realizeClone; 
+        //this will come to contain all the realization counts 
+        //such that realizeDistrib[n] will be the number of degree sequences 
+        //with n-many realizations, and so forth
+        
+        ArrayList<ArrayList<Integer>> blankList; 
+        ArrayList<Integer> seqList = new ArrayList<Integer>();
+        ArrayList<Integer> seqClone;
+        ArrayList<ArrayList<ArrayList<Integer>>> holdVals;
+        //startup values
+        int blankCount;
+        int[] sendSeq;
+        int[][] printSeq = new int[size][10];
+        int negCount; 
+        int howMany;
+        treeOfTrees infoNova = new treeOfTrees(-1);
+        while (seqCount < howManySeqs) {
+            //once for every possible sequence of length [size]
+            blankList = new ArrayList<ArrayList<Integer>>();
+            //reset the empty two-dimensional arrayList parameter
+            //now to initialize the empty two-dimensional arrayList
+            //containing a precise amount of empty one-dimensional arrayLists
+            blankCount = 0;
+            while (blankCount < size) {
+                seqClone = new ArrayList(seqList); 
+                //have to repeatedly clone seqList due to some Java quirk 
+                blankList.add(seqClone);
+                blankCount++;
+            }
+            holdVals = new ArrayList<ArrayList<ArrayList<Integer>>>();
+            //reset the tree-representation holder every time
+            sendSeq = converter(allSeqs.get(seqCount));
+            //and convert the tree sequence of the day into a workable form
+            //and away we go
+            int[] sendClone = new int[sendSeq.length];
+            arrayClone(sendSeq, sendClone);
+            holdVals = treeThree(blankList, sendSeq, sendClone, infoTree);
+            
+            sendClone = new int[sendSeq.length]; 
+            arrayClone(sendSeq, sendClone);
+            ArrayList<ArrayList<ArrayList<Integer>>> howClone; 
+            howClone = new ArrayList<ArrayList<ArrayList<Integer>>>();  
+            holdVals = fastRemove(holdVals, false, sendSeq); 
+            tripleClone(holdVals, howClone); 
+            infoNova.bindNewSequence(sendClone, sendClone.length - 1, howClone);
+            howMany = holdVals.size(); 
+            if (howMany > bestWeveSeen) {
+                //if this tree has more non-isomorphic representations than 
+                //the others 
+                bestWeveSeen = howMany;
+                //arrayClone(sendSeq, printClone);
+                printSeq = new int[size][10];
+                negCount = 0; 
+                while (negCount < 10) {
+                    printSeq[0][negCount] = -1;
+                    negCount++;
+                }
+                negCount = 0; 
+                while (negCount < size) {
+                    printSeq[negCount][0] = sendSeq[negCount]; 
+                    negCount++;
+                }
+            }
+            else if (howMany == bestWeveSeen) {
+                negCount = 0; 
+                while (printSeq[0][negCount] != -1) {negCount++;}
+                blankCount = negCount; 
+                negCount = 0;
+                while (negCount < size) {
+                    printSeq[negCount][blankCount] = sendSeq[negCount]; 
+                    negCount++;
+                }
+            }
+            
+            while (howMany >= realizeDistrib.length) {
+                //if we're trying to make an entry for the first sequence 
+                //with, for example, five realizations, 
+                //and we only have room for sequences up to four at the moment, 
+                //then double the size of the preexisting array 
+                realizeClone = arrayDouble(realizeDistrib);
+                realizeDistrib = new int[realizeClone.length];
+                arrayClone(realizeClone, realizeDistrib);
+            }
+            realizeDistrib[howMany] = realizeDistrib[howMany] + 1;
+            //increase the number of n-realization sequences by 1 
+            
+            seqCount++;
+        }
+        System.out.println("For all sequences of length "+size+":");
+        if (printSeq[0][1] == -1) {
+        System.out.println("The sequence with the most representations is");
+        System.out.println(dualPrint(printSeq, 0, size));
+        }
+        else {
+        System.out.println("The sequences with the most representations are");
+        negCount = 0; 
+        while (printSeq[0][negCount] != -1) {
+            System.out.println(dualPrint(printSeq, negCount, size));
+            negCount++;
+        }
+        }
+        System.out.println("With "+bestWeveSeen+" representation(s).");
+        System.out.println("Additionally, the distribution is as follows: ");
+        System.out.println(arrayPrint(realizeDistrib));
+        
+        return infoNova;
+    }
+    
+    public static void tryAllLengthsUpTo(int cap) {
+        Instant startMoment = Instant.now();
+        Instant timeSince; 
+        int upCount = 2; 
+        int resultHold; 
+        while (upCount < cap) {
+            //or whatever number
+            resultHold = tryAllSeqsOfLength(upCount);
+            timeSince = Instant.now(); 
+            Duration since = Duration.between(startMoment, timeSince);
+            System.out.println("Total time elapsed: "+since.toMillis()+
+                    " milliseconds.");
+            upCount++;
+        }
+    }
+    
+    public static void tryAllLengthsUpToWithTrees(int cap) {
+        Instant startMoment = Instant.now();
+        Instant timeSince; 
+        int upCount = 2; 
+        //int resultHold; 
+        treeOfTrees basicTree = new treeOfTrees(-1);
+        treeOfTrees newTree;
+        while (upCount < cap) {
+            //or whatever number
+            newTree = tryAllSeqsOfLengthWithTrees(upCount, basicTree);
+            timeSince = Instant.now(); 
+            Duration since = Duration.between(startMoment, timeSince);
+            System.out.println("Total time elapsed: "+since.toMillis()+
+                    " milliseconds.");
+            upCount++;
+            basicTree = newTree;
+        }
     }
     
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        int[] start = {1, 1, 1, 1, 2, 2, 2, 4};
-        quickSorter(start);
-        ArrayList<Integer> basicList = new ArrayList<Integer>();
-        ArrayList<Integer> basicClone;
-        ArrayList<ArrayList<Integer>> toPass = new ArrayList<ArrayList<Integer>>();
-        int startCount = 0; 
-        while (startCount < start.length) {
-            basicClone = new ArrayList(basicList);
-            toPass.add(basicClone);
-            startCount++;
-        }
-        ArrayList<Integer> blankList = new ArrayList<Integer>();
-        ArrayList<ArrayList<ArrayList<Integer>>> toGive = new ArrayList<ArrayList<ArrayList<Integer>>>();
-        toGive = treeTwo(toPass, start, start);
-        System.out.println("Function call over.");
-        //toGive = isomorphRemove(toGive, false, start); //not sure why this is necessary.
-        //Could define a helper function to remove it. 
-        //The concerning part is that this is seeming to weed out things that 
-        //aren't isomorphic after all, or else that not all possibilities
-        //are being enumerated in the first place. 1/12/17 
-        //See above note; fixed and no longer necessary 01/28/17
-        //System.out.println("Function call over.");
-        Integer countTree = 0; 
-        while (countTree < toGive.size()) {
-            System.out.println(countTree+": "+toGive.get(countTree));
-            countTree++;
-        }
+        //INSTRUCTIONS FOR USE: de-comment whichever of the lines below 
+        //corresponds to the version of the algorithm you want to use, 
+        //then alter the argument so that it matches the sequence length 
+        //you want to compute up to. 
+        //The output will tell you, for each length, what the sequence is 
+        //with the most realizations, and how many realizations that is. 
+        //It will also give you a distribution of the results. 
+        //(A 5 in the third slot means that there exist 5 sequences with 
+        //three realizations, and so on. The zeroth slot is always 0.)
+        
+        
+        //tryAllLengthsUpTo(40); //Algorithm A (brute force)
+        //tryAllLengthsUpToWithTrees(20); //Algorithm C (dynamic programming)
     }
 }
